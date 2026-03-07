@@ -105,6 +105,9 @@ assets/job_*/
 # Generated videos (local copies — permanent storage is Azure Blob)
 output/videos/*.mp4
 
+# Generated background music tracks (regenerate with: python assets/music/generate_tracks.py)
+assets/music/*.wav
+
 # Pipeline checkpoint files
 checkpoint.json
 

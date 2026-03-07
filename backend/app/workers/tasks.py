@@ -225,6 +225,8 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
                 watermark_path=config.watermark_path,
                 splash_start_path=config.splash_start_path,
                 splash_end_path=config.splash_end_path,
+                background_music=config.background_music,
+                category=config.category.value if hasattr(config.category, 'value') else str(config.category),
             )
 
         save_checkpoint(

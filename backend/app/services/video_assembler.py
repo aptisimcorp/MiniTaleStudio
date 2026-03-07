@@ -11,13 +11,21 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import (
     AudioFileClip,
+    CompositeAudioClip,
     CompositeVideoClip,
     ImageClip,
     concatenate_videoclips,
+    afx,
 )
 
 from app.config import settings
 from app.models import Scene, SubtitleStyle
+
+# Background music volume relative to narration (0.0 - 1.0)
+_MUSIC_VOLUME = 0.15
+
+# Music directory
+_MUSIC_DIR = os.path.join(settings.assets_dir, "music")
 
 # Subtitle style presets (Pillow-based rendering)
 SUBTITLE_STYLES = {
@@ -146,6 +154,16 @@ def _srt_time_to_seconds(t: str) -> float:
     return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
 
 
+def _get_music_path(category: str) -> str | None:
+    """Find the background music file for the given category."""
+    # Try category-specific track first, then fall back to default
+    for name in [category.lower(), "default"]:
+        path = os.path.join(_MUSIC_DIR, f"{name}.wav")
+        if os.path.exists(path):
+            return path
+    return None
+
+
 def assemble_video(
     scenes: list[Scene],
     narration_path: str,
@@ -155,6 +173,8 @@ def assemble_video(
     watermark_path: str = None,
     splash_start_path: str = None,
     splash_end_path: str = None,
+    background_music: bool = False,
+    category: str = "default",
 ) -> str:
     width = settings.default_width
     height = settings.default_height
@@ -188,7 +208,35 @@ def assemble_video(
         scene_clips.append(clip)
 
     video = concatenate_videoclips(scene_clips, method="compose")
-    video = video.set_audio(narration)
+
+    # Mix background music with narration if enabled
+    if background_music:
+        music_path = _get_music_path(category)
+        if music_path:
+            try:
+                music = AudioFileClip(music_path)
+                # Loop music to match narration duration
+                if music.duration < total_duration:
+                    loops_needed = int(total_duration / music.duration) + 1
+                    music = concatenate_videoclips(
+                        [music.to_soundarray for _ in range(loops_needed)]
+                    ) if False else music.fx(afx.audio_loop, duration=total_duration)
+                else:
+                    music = music.subclip(0, total_duration)
+                # Lower music volume so narration stays clear
+                music = music.volumex(_MUSIC_VOLUME)
+                # Mix narration + music
+                mixed_audio = CompositeAudioClip([narration, music])
+                video = video.set_audio(mixed_audio)
+                print(f"[VideoAssembler] Background music added: {os.path.basename(music_path)} (vol={_MUSIC_VOLUME})")
+            except Exception as e:
+                print(f"[VideoAssembler] Background music failed, using narration only: {e}")
+                video = video.set_audio(narration)
+        else:
+            print(f"[VideoAssembler] No music file found for category '{category}', skipping")
+            video = video.set_audio(narration)
+    else:
+        video = video.set_audio(narration)
 
     # Overlay subtitles using Pillow-rendered frames (no ImageMagick needed)
     style = SUBTITLE_STYLES.get(subtitle_style, SUBTITLE_STYLES[SubtitleStyle.DEFAULT])

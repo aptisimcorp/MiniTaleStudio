@@ -37,6 +37,21 @@ async def lifespan(app: FastAPI):
     os.makedirs(os.path.join(settings.assets_dir, "images"), exist_ok=True)
     os.makedirs(os.path.join(settings.assets_dir, "audio"), exist_ok=True)
     os.makedirs(os.path.join(settings.assets_dir, "subtitles"), exist_ok=True)
+    os.makedirs(os.path.join(settings.assets_dir, "music"), exist_ok=True)
+    # Auto-generate background music tracks if missing
+    music_dir = os.path.join(settings.assets_dir, "music")
+    if not os.path.exists(os.path.join(music_dir, "default.wav")):
+        try:
+            import importlib.util
+            gen_script = os.path.join(music_dir, "generate_tracks.py")
+            if os.path.exists(gen_script):
+                spec = importlib.util.spec_from_file_location("gen_tracks", gen_script)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                mod.main()
+                print("[Startup] Background music tracks generated")
+        except Exception as e:
+            print(f"[Startup] Music generation skipped: {e}")
     os.makedirs(os.path.join(settings.output_dir, "videos"), exist_ok=True)
     os.makedirs(settings.jobs_dir, exist_ok=True)
     os.makedirs(UPLOAD_DIR, exist_ok=True)
