@@ -1,0 +1,52 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node
+node_modules/
+frontend/build/
+
+# Generated assets
+assets/images/*.png
+assets/images/*.jpg
+assets/audio/*.mp3
+assets/subtitles/*.srt
+
+# Generated videos
+output/videos/*.mp4
+
+# Job working directories (generated assets per job)
+assets/job_*/
+**/job_*/
+
+# Uploaded files (watermarks, splash screens)
+uploads/
+
+# Temp fix scripts
+_fix_*.py
+_cleanup_*.py
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Distribution
+dist/
+build/
+*.egg-info/
+/.vs
