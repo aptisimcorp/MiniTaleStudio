@@ -132,3 +132,5 @@ _cleanup_*.py
 *.tmp
 *.temp
 *.bak
+/backend/story_20260307_123729TEMP_MPY_wvf_snd.mp4
+/backend/story_20260306_155048TEMP_MPY_wvf_snd.mp4
