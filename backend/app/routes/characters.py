@@ -13,7 +13,7 @@ from app.auth import get_current_user
 from app.database import cosmos_db
 from app.services.character_service import get_all_characters
 
-router = APIRouter(prefix="/characters", tags=["Characters"])
+router = APIRouter(prefix="/api/characters", tags=["Characters"])
 
 
 # ---------------------------------------------------------------------------

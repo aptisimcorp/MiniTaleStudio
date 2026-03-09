@@ -121,7 +121,7 @@ export async function getVideos() {
 // Characters
 
 export async function getCharacters() {
-  const { data } = await api.get("/characters");
+  const { data } = await api.get("/api/characters");
   return data.characters || [];
 }
 
