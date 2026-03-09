@@ -32,6 +32,9 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    # If a worker is killed mid-task, Redis will re-deliver the unacked
+    # message after this timeout so another worker can pick it up.
+    broker_transport_options={"visibility_timeout": 600},  # 10 minutes
     # Upstash Redis TLS settings
     broker_use_ssl=_ssl_conf if _redis_uses_tls else None,
     redis_backend_use_ssl=_ssl_conf if _redis_uses_tls else None,

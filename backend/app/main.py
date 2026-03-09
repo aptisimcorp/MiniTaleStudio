@@ -11,6 +11,7 @@ from app.database import cosmos_db
 from app.routes import configurations, videos, jobs, scheduler
 from app.routes import auth as auth_route
 from app.routes import youtube as youtube_route
+from app.routes import characters as characters_route
 from app.routes.auth import seed_admin_user
 from app.services.blob_storage import ensure_container_exists
 
@@ -34,9 +35,6 @@ def _start_cleanup_scheduler():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     cosmos_db.connect()
-    os.makedirs(os.path.join(settings.assets_dir, "images"), exist_ok=True)
-    os.makedirs(os.path.join(settings.assets_dir, "audio"), exist_ok=True)
-    os.makedirs(os.path.join(settings.assets_dir, "subtitles"), exist_ok=True)
     os.makedirs(os.path.join(settings.assets_dir, "music"), exist_ok=True)
     # Auto-generate background music tracks if missing
     music_dir = os.path.join(settings.assets_dir, "music")
@@ -59,11 +57,25 @@ async def lifespan(app: FastAPI):
     # Seed default admin user
     seed_admin_user()
 
+    # Seed characters from JSON into CosmosDB (one-time migration)
+    try:
+        from app.services.character_service import seed_characters_from_json
+        seed_characters_from_json()
+    except Exception as e:
+        print(f"[Startup] Character seed failed (non-fatal): {e}")
+
     # Ensure Azure Blob container exists
     ensure_container_exists()
 
     # Start cleanup scheduler
     _start_cleanup_scheduler()
+
+    # Recover any jobs stuck in 'running' from a prior crash
+    try:
+        from app.services.job_recovery import recover_stuck_jobs
+        recover_stuck_jobs()
+    except Exception as e:
+        print(f"[Startup] Job recovery failed (non-fatal): {e}")
 
     yield
 
@@ -93,6 +105,7 @@ app.include_router(auth_route.router, tags=["Authentication"])
 app.include_router(configurations.router, tags=["Configurations"])
 app.include_router(videos.router, tags=["Videos"])
 app.include_router(jobs.router, tags=["Jobs"])
+app.include_router(characters_route.router)
 app.include_router(scheduler.router, tags=["Scheduler"])
 app.include_router(youtube_route.router, tags=["YouTube"])
 

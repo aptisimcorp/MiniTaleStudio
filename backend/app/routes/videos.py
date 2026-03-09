@@ -11,6 +11,9 @@ from app.models import GenerateVideoRequest, JobStatus, PipelineStep
 router = APIRouter()
 
 
+
+
+
 @router.post("/generate-video")
 async def generate_video(request: GenerateVideoRequest, user: dict = Depends(get_current_user)):
     from app.workers.tasks import run_video_pipeline
@@ -18,6 +21,8 @@ async def generate_video(request: GenerateVideoRequest, user: dict = Depends(get
     job_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
     user_id = user["user_id"]
+
+    config_dict = request.model_dump()
 
     job_item = {
         "id": job_id,
@@ -28,17 +33,21 @@ async def generate_video(request: GenerateVideoRequest, user: dict = Depends(get
         "category": request.category.value,
         "language": request.language.value,
         "duration": request.duration.value,
+        "ai_service": request.ai_service.value,
+        "character_style": request.character_style.value,
+        "characters": request.characters,
         "title": "",
         "script": "",
         "video_path": None,
         "blob_url": None,
+        "total_cost": 0.0,
         "error": None,
         "created_at": now,
         "updated_at": now,
+        "config_dict": config_dict,
     }
     cosmos_db.create_item("jobs", job_item)
 
-    config_dict = request.model_dump()
     run_video_pipeline.delay(job_id, config_dict, user_id)
 
     return {"job_id": job_id, "status": "queued", "message": "Video generation started."}
@@ -63,18 +72,28 @@ async def retry_job(job_id: str, user: dict = Depends(get_current_user)):
 
     user_id = user["user_id"]
 
-    # Reconstruct config from stored job fields
-    config_dict = {
-        "category": job.get("category", "horror"),
-        "language": job.get("language", "english"),
-        "duration": job.get("duration", "60-90"),
-        "configuration_id": job.get("configuration_id", ""),
-    }
-    # If original config was stored, use it
-    if job.get("config_dict"):
-        config_dict = job["config_dict"]
+    # Recover the full config that was saved at job creation time.
+    # Fall back to reconstructing from individual job fields so older
+    # jobs (created before config_dict was persisted) still work.
+    config_dict = job.get("config_dict")
+    if not config_dict:
+        config_dict = {
+            "category": job.get("category", "horror"),
+            "language": job.get("language", "english"),
+            "duration": job.get("duration", "60-90"),
+            "configuration_id": job.get("configuration_id", ""),
+            "ai_service": job.get("ai_service", "openai"),
+            "character_style": job.get("character_style", "realistic"),
+            "characters": job.get("characters", []),
+            "voice_type": job.get("voice_type", "alloy"),
+            "background_music": job.get("background_music", False),
+            "subtitle_style": job.get("subtitle_style", "default"),
+            "image_style": job.get("image_style", "photo_realism"),
+            "watermark_path": job.get("watermark_path"),
+            "splash_start_path": job.get("splash_start_path"),
+            "splash_end_path": job.get("splash_end_path"),
+        }
 
-    # Reset job status to running
     run_video_pipeline.delay(job_id, config_dict, user_id)
 
     return {"job_id": job_id, "status": "retrying", "message": "Job retry started. Will resume from last checkpoint."}
@@ -104,6 +123,10 @@ async def list_videos(user: dict = Depends(get_current_user)):
             "category": item.get("category", ""),
             "language": item.get("language", ""),
             "duration": item.get("duration", ""),
+            "ai_service": item.get("ai_service", "openai"),
+            "character_style": item.get("character_style", ""),
+            "characters": item.get("characters", []),
+            "total_cost": item.get("total_cost", 0.0),
             "thumbnail": None,
             "file_path": filename,
             "blob_url": item.get("blob_url", ""),

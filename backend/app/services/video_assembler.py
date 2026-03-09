@@ -14,6 +14,7 @@ from moviepy.editor import (
     CompositeAudioClip,
     CompositeVideoClip,
     ImageClip,
+    VideoFileClip,
     concatenate_videoclips,
     afx,
 )
@@ -336,4 +337,177 @@ def assemble_video(
     for clip in scene_clips:
         clip.close()
 
+    return output_path
+
+
+def assemble_video_from_clips(
+    scenes: list[Scene],
+    narration_path: str,
+    subtitle_path: str,
+    subtitle_style: SubtitleStyle,
+    work_dir: str,
+    watermark_path: str = None,
+    splash_start_path: str = None,
+    splash_end_path: str = None,
+    background_music: bool = False,
+    category: str = "default",
+) -> str:
+    """Assemble final video from Grok-generated video clips (MP4s) instead of images.
+
+    This function merges individual scene video clips, adds narration,
+    subtitles, background music, watermark, and splash screens.
+    """
+    width = settings.default_width
+    height = settings.default_height
+    fps = settings.default_fps
+
+    # Load narration to get total duration
+    narration = AudioFileClip(narration_path)
+    total_duration = narration.duration
+
+    # Load scene video clips
+    scene_clips = []
+    clip_objects = []  # track for cleanup
+    total_clip_duration = 0
+
+    for scene in scenes:
+        if scene.video_clip_path and os.path.exists(scene.video_clip_path):
+            clip = VideoFileClip(scene.video_clip_path).resize((width, height))
+            clip_objects.append(clip)
+            total_clip_duration += clip.duration
+            scene_clips.append(clip)
+        else:
+            # Fallback: use image if video clip is missing
+            if scene.image_path and os.path.exists(scene.image_path):
+                word_count = len(scene.text.split())
+                total_words = sum(len(s.text.split()) for s in scenes) or 1
+                scene_dur = (word_count / total_words) * total_duration
+                clip = (
+                    ImageClip(scene.image_path)
+                    .set_duration(scene_dur)
+                    .resize((width, height))
+                )
+                clip_objects.append(clip)
+                scene_clips.append(clip)
+                print(f"[VideoAssembler] Scene {scene.index}: Fallback to image (no video clip)")
+            else:
+                print(f"[VideoAssembler] Scene {scene.index}: No video clip or image, skipping")
+
+    if not scene_clips:
+        raise RuntimeError("No scene clips available for video assembly")
+
+    video = concatenate_videoclips(scene_clips, method="compose")
+
+    # Speed-adjust video to match narration duration if needed
+    if abs(video.duration - total_duration) > 1.0:
+        speed_factor = video.duration / total_duration
+        video = video.fx(lambda c: c.speedx(speed_factor))
+        print(f"[VideoAssembler] Speed-adjusted clips: {speed_factor:.2f}x to match narration")
+
+    # Mix audio (same logic as image-based assembly)
+    if background_music:
+        music_path = _get_music_path(category)
+        if music_path:
+            try:
+                music = AudioFileClip(music_path)
+                if music.duration < total_duration:
+                    music = music.fx(afx.audio_loop, duration=total_duration)
+                else:
+                    music = music.subclip(0, total_duration)
+                music = music.volumex(_MUSIC_VOLUME)
+                mixed_audio = CompositeAudioClip([narration, music])
+                video = video.set_audio(mixed_audio)
+                print(f"[VideoAssembler] Background music added: {os.path.basename(music_path)}")
+            except Exception as e:
+                print(f"[VideoAssembler] Background music failed: {e}")
+                video = video.set_audio(narration)
+        else:
+            video = video.set_audio(narration)
+    else:
+        video = video.set_audio(narration)
+
+    # Subtitles overlay
+    style = SUBTITLE_STYLES.get(subtitle_style, SUBTITLE_STYLES[SubtitleStyle.DEFAULT])
+    srt_entries = _parse_srt(subtitle_path)
+
+    overlay_clips = []
+    for entry in srt_entries:
+        try:
+            frame = _render_subtitle_frame(entry["text"], width, height, style)
+            sub_clip = (
+                ImageClip(frame, ismask=False, transparent=True)
+                .set_start(entry["start"])
+                .set_duration(entry["end"] - entry["start"])
+                .set_position((0, 0))
+            )
+            overlay_clips.append(sub_clip)
+        except Exception as e:
+            print(f"[Subtitles] Skipping entry: {e}")
+
+    # Watermark
+    if watermark_path and os.path.exists(watermark_path):
+        try:
+            wm_img = Image.open(watermark_path).convert("RGBA")
+            wm_target_w = int(width * 0.15)
+            wm_ratio = wm_target_w / wm_img.width
+            wm_target_h = int(wm_img.height * wm_ratio)
+            wm_img = wm_img.resize((wm_target_w, wm_target_h), Image.LANCZOS)
+            alpha = wm_img.split()[3]
+            alpha = alpha.point(lambda p: int(p * 0.7))
+            wm_img.putalpha(alpha)
+            wm_array = np.array(wm_img)
+            wm_clip = (
+                ImageClip(wm_array, ismask=False, transparent=True)
+                .set_duration(video.duration)
+                .set_position((30, 30))
+            )
+            overlay_clips.append(wm_clip)
+        except Exception as e:
+            print(f"[VideoAssembler] Watermark failed: {e}")
+
+    final = CompositeVideoClip([video] + overlay_clips, size=(width, height))
+
+    # Splash screens
+    clips_to_concat = []
+    if splash_start_path and os.path.exists(splash_start_path):
+        try:
+            splash_start = ImageClip(splash_start_path).set_duration(3).resize((width, height))
+            clips_to_concat.append(splash_start)
+        except Exception:
+            pass
+
+    clips_to_concat.append(final)
+
+    if splash_end_path and os.path.exists(splash_end_path):
+        try:
+            splash_end = ImageClip(splash_end_path).set_duration(3).resize((width, height))
+            clips_to_concat.append(splash_end)
+        except Exception:
+            pass
+
+    if len(clips_to_concat) > 1:
+        final = concatenate_videoclips(clips_to_concat, method="compose")
+
+    # Output
+    videos_dir = os.path.join(settings.output_dir, "videos")
+    os.makedirs(videos_dir, exist_ok=True)
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    output_path = os.path.join(videos_dir, f"story_{timestamp}.mp4")
+
+    final.write_videofile(
+        output_path,
+        fps=fps,
+        codec="libx264",
+        audio_codec="aac",
+        threads=4,
+        logger=None,
+    )
+
+    # Cleanup
+    narration.close()
+    final.close()
+    for clip in clip_objects:
+        clip.close()
+
+    print(f"[VideoAssembler] Grok clip assembly complete: {output_path}")
     return output_path
