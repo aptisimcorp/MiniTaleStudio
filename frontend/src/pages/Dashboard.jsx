@@ -22,6 +22,10 @@ const DEFAULT_CONFIG = {
   subtitle_style: "default",
   image_style: "photo_realism",
   num_videos: 1,
+  // Character pipeline
+  ai_service: "openai",
+  character_style: "realistic",
+  characters: [],
 };
 
 const DEFAULT_SCHEDULE = {
@@ -73,6 +77,9 @@ export default function Dashboard() {
             watermark_path: config.watermark_path || null,
             splash_start_path: config.splash_start_path || null,
             splash_end_path: config.splash_end_path || null,
+            ai_service: config.ai_service || "openai",
+            character_style: config.character_style || "realistic",
+            characters: config.characters || [],
           });
         }
         toast.success(

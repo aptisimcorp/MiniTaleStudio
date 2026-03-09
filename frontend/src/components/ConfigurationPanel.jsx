@@ -1,5 +1,5 @@
-﻿import React, { useRef } from "react";
-import { uploadFile } from "../api/client";
+﻿import React, { useRef, useEffect, useState } from "react";
+import { uploadFile, getCharacters } from "../api/client";
 
 const CATEGORIES = [
   { value: "horror", label: "🧟 Horror" },
@@ -42,6 +42,18 @@ const IMAGE_STYLES = [
   { value: "3d_toon", label: "🫧 3D Toon" },
 ];
 
+const CHARACTER_STYLES = [
+  { value: "realistic", label: "📷 Realistic" },
+  { value: "3dtoon", label: "🫧 3D Toon" },
+  { value: "ghibli", label: "🌿 Ghibli" },
+  { value: "lego", label: "🧱 Lego" },
+];
+
+const AI_SERVICES = [
+  { value: "openai", label: "🤖 OpenAI", desc: "Images + Slideshow" },
+  { value: "grok", label: "⚡ Grok", desc: "Video Clips" },
+];
+
 const SUBTITLE_STYLES = [
   { value: "default", label: "Default" },
   { value: "bold", label: "Bold" },
@@ -56,6 +68,15 @@ const watermarkRef = useRef(null);
 const splashStartRef = useRef(null);
 const splashEndRef = useRef(null);
 
+const [allCharacters, setAllCharacters] = useState([]);
+
+// Load characters on mount
+useEffect(() => {
+  getCharacters()
+    .then(setAllCharacters)
+    .catch(() => setAllCharacters([]));
+}, []);
+
 const handleUpload = async (file, configKey) => {
   if (!file) return;
   try {
@@ -66,9 +87,110 @@ const handleUpload = async (file, configKey) => {
   }
 };
 
+const toggleCharacter = (name) => {
+  const current = config.characters || [];
+  if (current.includes(name)) {
+    update("characters", current.filter((c) => c !== name));
+  } else {
+    update("characters", [...current, name]);
+  }
+};
+
+const selectedStyle = config.character_style || "realistic";
+
   return (
     <div className="bg-dark-900 rounded-xl border border-dark-700 p-6 space-y-5">
       <h2 className="text-lg font-semibold text-white">⚙️ Configuration</h2>
+
+      {/* AI Service Selection */}
+      <div>
+        <label className="block text-sm font-medium text-dark-300 mb-1">AI Service</label>
+        <div className="grid grid-cols-2 gap-2">
+          {AI_SERVICES.map((s) => (
+            <button
+              key={s.value}
+              onClick={() => update("ai_service", s.value)}
+              className={`px-3 py-3 rounded-lg text-sm font-medium transition-all text-center ${
+                config.ai_service === s.value
+                  ? "bg-primary-600 text-white shadow-lg shadow-primary-600/25"
+                  : "bg-dark-800 text-dark-300 hover:bg-dark-700"
+              }`}
+            >
+              <div>{s.label}</div>
+              <div className="text-xs opacity-70 mt-0.5">{s.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Character Style Selection */}
+      <div>
+        <label className="block text-sm font-medium text-dark-300 mb-1">Character Style</label>
+        <div className="grid grid-cols-4 gap-2">
+          {CHARACTER_STYLES.map((s) => (
+            <button
+              key={s.value}
+              onClick={() => update("character_style", s.value)}
+              className={`px-2 py-2 rounded-lg text-xs font-medium transition-all ${
+                selectedStyle === s.value
+                  ? "bg-primary-600 text-white shadow-lg shadow-primary-600/25"
+                  : "bg-dark-800 text-dark-300 hover:bg-dark-700"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Character Selection Grid */}
+      {allCharacters.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-dark-300 mb-1">
+            Characters {(config.characters || []).length > 0 && (
+              <span className="text-primary-400">({(config.characters || []).length} selected)</span>
+            )}
+          </label>
+          <div className="grid grid-cols-5 gap-2 max-h-52 overflow-y-auto pr-1">
+            {allCharacters.map((char) => {
+              const isSelected = (config.characters || []).includes(char.name);
+              const imgUrl = `/characters/${char.name}/${selectedStyle}.jpg`;
+              return (
+                <button
+                  key={char.name}
+                  onClick={() => toggleCharacter(char.name)}
+                  className={`relative rounded-lg overflow-hidden transition-all border-2 ${
+                    isSelected
+                      ? "border-primary-500 shadow-lg shadow-primary-500/30"
+                      : "border-transparent hover:border-dark-500"
+                  }`}
+                  title={`${char.displayName} (${char.role})`}
+                >
+                  {imgUrl ? (
+                    <img
+                      src={imgUrl}
+                      alt={char.displayName}
+                      className="w-full aspect-square object-cover"
+                    />
+                  ) : (
+                    <div className="w-full aspect-square bg-dark-800 flex items-center justify-center text-2xl">
+                      👤
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1 py-0.5">
+                    <p className="text-[10px] text-white truncate text-center">{char.displayName}</p>
+                  </div>
+                  {isSelected && (
+                    <div className="absolute top-1 right-1 w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs">✓</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Category */}
       <div>
@@ -139,25 +261,27 @@ const handleUpload = async (file, configKey) => {
         </div>
       </div>
 
-      {/* Image Style */}
-      <div>
-        <label className="block text-sm font-medium text-dark-300 mb-1">Image Style</label>
-        <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
-          {IMAGE_STYLES.map((s) => (
-            <button
-              key={s.value}
-              onClick={() => update("image_style", s.value)}
-              className={`px-2 py-2 rounded-lg text-xs font-medium transition-all ${
-                config.image_style === s.value
-                  ? "bg-primary-600 text-white shadow-lg shadow-primary-600/25"
-                  : "bg-dark-800 text-dark-300 hover:bg-dark-700"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
+      {/* Image Style (only shown for OpenAI pipeline) */}
+      {config.ai_service !== "grok" && (
+        <div>
+          <label className="block text-sm font-medium text-dark-300 mb-1">Image Style</label>
+          <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
+            {IMAGE_STYLES.map((s) => (
+              <button
+                key={s.value}
+                onClick={() => update("image_style", s.value)}
+                className={`px-2 py-2 rounded-lg text-xs font-medium transition-all ${
+                  config.image_style === s.value
+                    ? "bg-primary-600 text-white shadow-lg shadow-primary-600/25"
+                    : "bg-dark-800 text-dark-300 hover:bg-dark-700"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Voice Type */}
       <div>

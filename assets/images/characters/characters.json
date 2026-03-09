@@ -1,0 +1,136 @@
+{
+  "characters": [
+    {
+      "name": "aanya",
+      "displayName": "Aanya Mehra",
+      "role": "journalist",
+      "descriptionPrompt": "beautiful investigative journalist, long wavy dark hair, expressive eyes, confident personality, intelligent and fearless woman",
+      "images": {
+        "3dtoon": "assets/images/characters/aanya/3dtoon.jpg",
+        "ghibli": "assets/images/characters/aanya/ghibli.jpg",
+        "lego": "assets/images/characters/aanya/lego.jpg",
+        "realistic": "assets/images/characters/aanya/realistic.jpg"
+      }
+    },
+    {
+      "name": "arjun",
+      "displayName": "Arjun",
+      "role": "hero",
+      "descriptionPrompt": "10 year old adventurous indian boy, messy black hair, red hoodie, curious personality, brave and friendly child hero",
+      "images": {
+        "3dtoon": "assets/images/characters/arjun/3dtoon.jpg",
+        "ghibli": "assets/images/characters/arjun/ghibli.jpg",
+        "lego": "assets/images/characters/arjun/lego.jpg",
+        "realistic": "assets/images/characters/arjun/realistic.jpg"
+      }
+    },
+    {
+      "name": "armaan",
+      "displayName": "Armaan Khanna",
+      "role": "detective",
+      "descriptionPrompt": "crime detective with sharp jawline, short messy hair, light beard, serious expression, leather jacket, intense eyes",
+      "images": {
+        "3dtoon": "assets/images/characters/armaan/3dtoon.jpg",
+        "ghibli": "assets/images/characters/armaan/ghibli.jpg",
+        "lego": "assets/images/characters/armaan/lego.jpg",
+        "realistic": "assets/images/characters/armaan/realistic.jpg"
+      }
+    },
+    {
+      "name": "bobo",
+      "displayName": "Bobo",
+      "role": "comic_creature",
+      "descriptionPrompt": "cute round fluffy orange creature, big expressive eyes, small horns, funny personality, cheerful magical companion",
+      "images": {
+        "3dtoon": "assets/images/characters/bobo/3dtoon.jpg",
+        "ghibli": "assets/images/characters/bobo/ghibli.jpg",
+        "lego": "assets/images/characters/bobo/lego.jpg",
+        "realistic": "assets/images/characters/bobo/realistic.jpg"
+      }
+    },
+    {
+      "name": "deenu",
+      "displayName": "Deenu",
+      "role": "sidekick",
+      "descriptionPrompt": "elderly Indian guru, very old man with long white beard and long white hair, kind wise face, saffron yellow traditional robes, one finger raised teaching gesture, temple corridor background, peaceful expression, detailed portrait",
+      "images": {
+        "3dtoon": "assets/images/characters/deenu/3dtoon.jpg",
+        "ghibli": "assets/images/characters/deenu/ghibli.jpg",
+        "lego": "assets/images/characters/deenu/lego.jpg",
+        "realistic": "assets/images/characters/deenu/realistic.jpg"
+      }
+    },
+    {
+      "name": "mira",
+      "displayName": "Mira",
+      "role": "explorer",
+      "descriptionPrompt": "young explorer girl, shoulder length brown hair, green eyes, yellow jacket, curious and intelligent personality",
+      "images": {
+        "3dtoon": "assets/images/characters/mira/3dtoon.jpg",
+        "ghibli": "assets/images/characters/mira/ghibli.jpg",
+        "lego": "assets/images/characters/mira/lego.jpg",
+        "realistic": "assets/images/characters/mira/realistic.jpg"
+      }
+    },
+    {
+      "name": "nancy",
+      "displayName": "Nancy",
+      "role": "spy",
+      "descriptionPrompt": "attractive curvy Indian girl, voluptuous bust, long dark wavy hair, confident smile, bright yellow deep V-neck slip dress, gold jewelry, elegant stone corridor background, warm lighting",
+      "images": {
+        "3dtoon": "assets/images/characters/nancy/3dtoon.jpg",
+        "ghibli": "assets/images/characters/nancy/ghibli.jpg",
+        "lego": "assets/images/characters/nancy/lego.jpg",
+        "realistic": "assets/images/characters/nancy/realistic.jpg"
+      }
+    },
+    {
+      "name": "raghav",
+      "displayName": "Raghav Suri",
+      "role": "crime_boss",
+      "descriptionPrompt": "powerful crime boss with salt and pepper hair, strong jawline, expensive suit, intimidating presence",
+      "images": {
+        "3dtoon": "assets/images/characters/raghav/3dtoon.jpg",
+        "ghibli": "assets/images/characters/raghav/ghibli.jpg",
+        "lego": "assets/images/characters/raghav/lego.jpg",
+        "realistic": "assets/images/characters/raghav/realistic.jpg"
+      }
+    },
+    {
+      "name": "rani",
+      "displayName": "Rani",
+      "role": "femme_fatale",
+      "descriptionPrompt": "sexy Indian woman in red saree, deep neck blouse, holding gun, long hair, smiling, temple arch background",
+      "images": {
+        "3dtoon": "assets/images/characters/rani/3dtoon.jpg",
+        "ghibli": "assets/images/characters/rani/ghibli.jpg",
+        "lego": "assets/images/characters/rani/lego.jpg",
+        "realistic": "assets/images/characters/rani/realistic.jpg"
+      }
+    },
+    {
+      "name": "sofia",
+      "displayName": "Sofia D'Souza",
+      "role": "femme_fatale",
+      "descriptionPrompt": "extremely attractive mysterious woman with long black hair, elegant fashion, confident and seductive personality",
+      "images": {
+        "3dtoon": "assets/images/characters/sofia/3dtoon.jpg",
+        "ghibli": "assets/images/characters/sofia/ghibli.jpg",
+        "lego": "assets/images/characters/sofia/lego.jpg",
+        "realistic": "assets/images/characters/sofia/realistic.jpg"
+      }
+    },
+    {
+      "name": "zara",
+      "displayName": "Zara Khan",
+      "role": "hacker",
+      "descriptionPrompt": "brilliant female hacker with confident expression, shoulder length dark hair, tech savvy personality",
+      "images": {
+        "3dtoon": "assets/images/characters/zara/3dtoon.jpg",
+        "ghibli": "assets/images/characters/zara/ghibli.jpg",
+        "lego": "assets/images/characters/zara/lego.jpg",
+        "realistic": "assets/images/characters/zara/realistic.jpg"
+      }
+    }
+  ]
+}
