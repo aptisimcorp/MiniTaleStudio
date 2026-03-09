@@ -137,3 +137,7 @@ _cleanup_*.py
 *.bak
 /backend/story_20260307_123729TEMP_MPY_wvf_snd.mp4
 /backend/story_20260306_155048TEMP_MPY_wvf_snd.mp4
+/backend/story_20260308_181554TEMP_MPY_wvf_snd.mp4
+/backend/story_20260308_190935TEMP_MPY_wvf_snd.mp4
+/.env.example
+/minitalestudio_character_pipeline.md
