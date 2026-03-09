@@ -12,6 +12,7 @@ CONTAINERS = {
     "users": "/role",
     "videos": "/category",
     "youtube_accounts": "/user_id",
+    "characters": "/role",
 }
 
 

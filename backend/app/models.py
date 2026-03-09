@@ -87,6 +87,18 @@ class SubtitleStyle(str, Enum):
     MINIMAL = "minimal"
 
 
+class AIService(str, Enum):
+    OPENAI = "openai"
+    GROK = "grok"
+
+
+class CharacterStyle(str, Enum):
+    REALISTIC = "realistic"
+    THREE_D_TOON = "3dtoon"
+    GHIBLI = "ghibli"
+    LEGO = "lego"
+
+
 class JobStatus(str, Enum):
     QUEUED = "queued"
     RUNNING = "running"
@@ -98,6 +110,7 @@ class PipelineStep(str, Enum):
     QUEUED = "queued"
     STORY = "generating_story"
     IMAGES = "generating_images"
+    VIDEO_CLIPS = "generating_video_clips"
     NARRATION = "generating_narration"
     SUBTITLES = "generating_subtitles"
     ASSEMBLING = "assembling_video"
@@ -111,6 +124,7 @@ PIPELINE_STEP_ORDER = [
     PipelineStep.QUEUED,
     PipelineStep.STORY,
     PipelineStep.IMAGES,
+    PipelineStep.VIDEO_CLIPS,
     PipelineStep.NARRATION,
     PipelineStep.SUBTITLES,
     PipelineStep.ASSEMBLING,
@@ -123,6 +137,7 @@ PIPELINE_STEP_LABELS = {
     PipelineStep.QUEUED: "Queued",
     PipelineStep.STORY: "Generating Story",
     PipelineStep.IMAGES: "Generating Images",
+    PipelineStep.VIDEO_CLIPS: "Generating Video Clips",
     PipelineStep.NARRATION: "Generating Narration",
     PipelineStep.SUBTITLES: "Generating Subtitles",
     PipelineStep.ASSEMBLING: "Assembling Video",
@@ -150,6 +165,10 @@ class ConfigurationCreate(BaseModel):
     watermark_path: Optional[str] = None
     splash_start_path: Optional[str] = None
     splash_end_path: Optional[str] = None
+    # Character pipeline
+    ai_service: AIService = AIService.OPENAI
+    character_style: CharacterStyle = CharacterStyle.REALISTIC
+    characters: list[str] = Field(default_factory=list)
 
 
 class ConfigurationResponse(ConfigurationCreate):
@@ -219,6 +238,10 @@ class GenerateVideoRequest(BaseModel):
     watermark_path: Optional[str] = None
     splash_start_path: Optional[str] = None
     splash_end_path: Optional[str] = None
+    # Character pipeline
+    ai_service: AIService = AIService.OPENAI
+    character_style: CharacterStyle = CharacterStyle.REALISTIC
+    characters: list[str] = Field(default_factory=list)
 
 
 # ?? Pipeline internal models ?????????????????????????????????????????????
@@ -227,7 +250,9 @@ class Scene(BaseModel):
     index: int
     text: str
     image_prompt: str
+    video_prompt: Optional[str] = None
     image_path: Optional[str] = None
+    video_clip_path: Optional[str] = None
     duration_seconds: float = 0.0
 
 
@@ -248,3 +273,4 @@ class PipelineContext(BaseModel):
     subtitle_path: Optional[str] = None
     video_path: Optional[str] = None
     work_dir: str = ""
+    total_cost: float = 0.0

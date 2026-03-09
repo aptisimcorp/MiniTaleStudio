@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
 
+    # Grok (xAI)
+    grok_api_key: str = os.getenv("GROK_API_KEY", "")
+
     # Azure Cosmos DB
     cosmos_db_connection_string: str = os.getenv("COSMOS_DB_CONNECTION_STRING", "")
     cosmos_db_database_name: str = os.getenv("COSMOS_DB_DATABASE_NAME", "minitale_studio")
@@ -19,6 +22,7 @@ class Settings(BaseSettings):
     # Azure Blob Storage
     azure_storage_connection_string: str = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
     azure_blob_container: str = "minitalestudio"
+    azure_blob_url: str = os.getenv("AZURE_BLOB_URL", "")
 
     # JWT Authentication
     jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "minitale-secret-change-me")
