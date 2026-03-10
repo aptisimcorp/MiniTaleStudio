@@ -249,7 +249,7 @@ async def youtube_upload(request: YouTubeUploadRequest, user: dict = Depends(get
         media = MediaFileUpload(tmp_path, mimetype="video/mp4", resumable=True)
         insert_request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
 
-        # Resumable upload — execute in a loop to handle chunked transfers
+        # Resumable upload - execute in a loop to handle chunked transfers
         response = None
         while response is None:
             upload_status, response = insert_request.next_chunk()
