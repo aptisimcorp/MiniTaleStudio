@@ -10,7 +10,7 @@ _scheduler: BackgroundScheduler | None = None
 def get_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is None:
-        _scheduler = BackgroundScheduler()
+        _scheduler = BackgroundScheduler(timezone="UTC")
         _scheduler.start()
     return _scheduler
 
@@ -93,6 +93,7 @@ def add_schedule(schedule: dict):
             day=parts[2] if len(parts) > 2 else "*",
             month=parts[3] if len(parts) > 3 else "*",
             day_of_week=parts[4] if len(parts) > 4 else "*",
+            timezone="UTC",
         )
     else:
         trigger = IntervalTrigger(days=1)
