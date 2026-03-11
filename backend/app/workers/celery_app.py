@@ -2,6 +2,7 @@ import os
 import ssl
 from dotenv import load_dotenv
 from celery import Celery
+from celery.signals import worker_ready
 
 # Ensure .env is loaded before importing settings (Celery workers may
 # start from a different working directory than the project root).
@@ -42,3 +43,32 @@ celery_app.conf.update(
 
 # Auto-discover tasks
 celery_app.autodiscover_tasks(["app.workers"])
+
+
+# ?? APScheduler lives in the worker process (not the web server) ??????
+# The web server on Render sleeps after inactivity, killing any in-memory
+# scheduler. The Celery worker stays alive as a background service, so
+# APScheduler runs here reliably.
+
+@worker_ready.connect
+def _on_worker_ready(**kwargs):
+    """Load all enabled schedules from Cosmos DB when the worker starts."""
+    try:
+        from app.scheduler.scheduler import load_schedules_from_db
+        load_schedules_from_db()
+    except Exception as e:
+        print(f"[Worker] Schedule loading failed (non-fatal): {e}")
+
+
+@celery_app.task(name="app.workers.celery_app.reload_schedules")
+def reload_schedules():
+    """Reload all schedules from DB into the worker's APScheduler.
+
+    Called via .delay() from the web API when a schedule is created or deleted,
+    so the worker picks up changes without a restart.
+    """
+    try:
+        from app.scheduler.scheduler import load_schedules_from_db
+        load_schedules_from_db()
+    except Exception as e:
+        print(f"[Worker] Schedule reload failed: {e}")

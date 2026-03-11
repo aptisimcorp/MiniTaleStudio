@@ -11,14 +11,14 @@ router = APIRouter()
 
 @router.post("/schedule-job", response_model=ScheduleResponse)
 async def schedule_job(schedule: ScheduleCreate):
-    from app.scheduler.scheduler import add_schedule
-
     item = schedule.model_dump()
     item["id"] = str(uuid.uuid4())
     item["created_at"] = datetime.utcnow().isoformat()
     saved = cosmos_db.create_item("schedules", item)
 
-    add_schedule(saved)
+    # Signal the Celery worker to reload schedules (APScheduler runs there)
+    from app.workers.celery_app import reload_schedules
+    reload_schedules.delay()
 
     return ScheduleResponse(**saved)
 
@@ -31,8 +31,6 @@ async def list_schedules():
 
 @router.delete("/schedules/{schedule_id}")
 async def delete_schedule(schedule_id: str):
-    from app.scheduler.scheduler import remove_schedule
-
     items = cosmos_db.query_items(
         "schedules",
         "SELECT * FROM c WHERE c.id = @id",
@@ -41,5 +39,9 @@ async def delete_schedule(schedule_id: str):
     if items:
         item = items[0]
         cosmos_db.delete_item("schedules", schedule_id, item.get("schedule_type", ""))
-        remove_schedule(schedule_id)
+
+    # Signal the Celery worker to reload schedules (removes deleted ones)
+    from app.workers.celery_app import reload_schedules
+    reload_schedules.delay()
+
     return {"message": "Schedule removed"}

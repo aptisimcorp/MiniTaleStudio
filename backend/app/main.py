@@ -55,13 +55,6 @@ async def lifespan(app: FastAPI):
     # Start cleanup scheduler
     _start_cleanup_scheduler()
 
-    # Load saved schedules from Cosmos DB into APScheduler
-    try:
-        from app.scheduler.scheduler import load_schedules_from_db
-        load_schedules_from_db()
-    except Exception as e:
-        print(f"[Startup] Schedule loading failed (non-fatal): {e}")
-
     # Recover any jobs stuck in 'running' from a prior crash
     try:
         from app.services.job_recovery import recover_stuck_jobs
