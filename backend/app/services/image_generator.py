@@ -276,6 +276,7 @@ def generate_scene_image(
             img_data = requests.get(image_url, timeout=120).content
             with open(image_path, "wb") as f:
                 f.write(img_data)
+            del img_data  # free download buffer immediately
 
             # Log raw dimensions before enforcement
             raw_img = Image.open(image_path)
@@ -314,6 +315,7 @@ def _enforce_portrait_orientation(image_path: str, target_w: int = 1024, target_
     w, h = img.size
 
     if w == target_w and h == target_h:
+        img.close()
         return
 
     # Log if DALL-E ignored our portrait request
@@ -339,6 +341,7 @@ def _enforce_portrait_orientation(image_path: str, target_w: int = 1024, target_
 
     img = img.resize((target_w, target_h), Image.LANCZOS)
     img.save(image_path, "PNG")
+    img.close()
 
 
 def generate_all_images(

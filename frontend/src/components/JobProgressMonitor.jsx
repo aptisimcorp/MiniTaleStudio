@@ -36,6 +36,7 @@ const PIPELINE_STEPS = [
   "generating_subtitles",
   "assembling_video",
   "uploading_blob",
+  "uploading_youtube",
   "cleanup",
   "done",
 ];
@@ -48,6 +49,7 @@ const STEP_LABELS = {
   generating_subtitles: "Generating Subtitles",
   assembling_video: "Assembling Video",
   uploading_blob: "Uploading to Cloud",
+  uploading_youtube: "Uploading to YouTube",
   cleanup: "Cleaning Up",
   done: "Done",
   failed: "Failed",

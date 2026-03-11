@@ -25,8 +25,24 @@ from app.models import Scene, SubtitleStyle
 # Background music volume relative to narration (0.0 - 1.0)
 _MUSIC_VOLUME = 0.15
 
-# Music directory
-_MUSIC_DIR = os.path.join(settings.assets_dir, "music")
+# Music directory -- pre-uploaded tracks in backend/app/workers/audio/
+_MUSIC_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "workers", "audio",
+)
+
+# Map each story category to the best-matching audio file.
+# Multiple categories can share the same file.
+_CATEGORY_MUSIC_MAP = {
+    "horror":   "horror.wav",
+    "crime":    "darkcrime.wav",
+    "thriller": "strangemovements.wav",
+    "mystery":  "nightthunder.wav",
+    "funny":    "happy.wav",
+    "history":  "nature.wav",
+    "adult":    "windblowing.wav",
+    "custom":   "nature.wav",
+}
 
 # Subtitle style presets (Pillow-based rendering)
 SUBTITLE_STYLES = {
@@ -35,18 +51,24 @@ SUBTITLE_STYLES = {
         "color": (255, 255, 255),
         "stroke_color": (0, 0, 0),
         "stroke_width": 3,
+        "shadow_color": (0, 0, 0),
+        "shadow_offset": (3, 3),
     },
     SubtitleStyle.BOLD: {
         "fontsize": 50,
         "color": (255, 255, 0),
         "stroke_color": (0, 0, 0),
         "stroke_width": 4,
+        "shadow_color": (0, 0, 0),
+        "shadow_offset": (4, 4),
     },
     SubtitleStyle.MINIMAL: {
         "fontsize": 38,
         "color": (255, 255, 255),
         "stroke_color": None,
         "stroke_width": 0,
+        "shadow_color": (0, 0, 0),
+        "shadow_offset": (2, 2),
     },
 }
 
@@ -120,7 +142,11 @@ def _get_font(size: int):
 
 
 def _render_subtitle_frame(text: str, width: int, height: int, style: dict) -> np.ndarray:
-    """Render a subtitle text into a transparent RGBA numpy array using Pillow."""
+    """Render a subtitle text into a transparent RGBA numpy array using Pillow.
+
+    Text is centered both horizontally and vertically on the screen,
+    with a drop shadow for readability on any background.
+    """
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = _get_font(style["fontsize"])
@@ -145,14 +171,25 @@ def _render_subtitle_frame(text: str, width: int, height: int, style: dict) -> n
     line_height = style["fontsize"] + 8
     total_text_height = len(lines) * line_height
 
-    # Position at bottom of frame
-    y_start = height - total_text_height - 60
+    # Position at vertical center of the frame
+    y_start = (height - total_text_height) // 2
+
+    shadow_color = style.get("shadow_color", (0, 0, 0))
+    shadow_offset = style.get("shadow_offset", (3, 3))
 
     for i, line in enumerate(lines):
         bbox = draw.textbbox((0, 0), line, font=font)
         text_w = bbox[2] - bbox[0]
         x = (width - text_w) // 2
         y = y_start + i * line_height
+
+        # Draw drop shadow
+        if shadow_color and shadow_offset:
+            sx, sy = shadow_offset
+            draw.text(
+                (x + sx, y + sy), line, font=font,
+                fill=shadow_color + (160,),
+            )
 
         # Draw stroke/outline
         if style.get("stroke_color") and style.get("stroke_width", 0) > 0:
@@ -195,12 +232,22 @@ def _srt_time_to_seconds(t: str) -> float:
 
 
 def _get_music_path(category: str) -> str | None:
-    """Find the background music file for the given category."""
-    # Try category-specific track first, then fall back to default
-    for name in [category.lower(), "default"]:
-        path = os.path.join(_MUSIC_DIR, f"{name}.wav")
+    """Find the best-matching background music file for the given category."""
+    # Look up the mapped filename for this category
+    filename = _CATEGORY_MUSIC_MAP.get(category.lower())
+    if filename:
+        path = os.path.join(_MUSIC_DIR, filename)
         if os.path.exists(path):
             return path
+
+    # Fallback: try any file in the directory (first .wav, then .mp3)
+    if os.path.isdir(_MUSIC_DIR):
+        for f in sorted(os.listdir(_MUSIC_DIR)):
+            if f.lower().endswith((".wav", ".mp3")):
+                print(f"[VideoAssembler] No mapping for '{category}', falling back to {f}")
+                return os.path.join(_MUSIC_DIR, f)
+
+    print(f"[VideoAssembler] WARNING: No music files found in {_MUSIC_DIR}")
     return None
 
 
@@ -370,11 +417,31 @@ def assemble_video(
         logger=None,
     )
 
-    # Cleanup
-    narration.close()
-    final.close()
+    # Cleanup -- close ALL clips to release memory
+    try:
+        final.close()
+    except Exception:
+        pass
     for clip in scene_clips:
-        clip.close()
+        try:
+            clip.close()
+        except Exception:
+            pass
+    for clip in overlay_clips:
+        try:
+            clip.close()
+        except Exception:
+            pass
+    try:
+        narration.close()
+    except Exception:
+        pass
+    try:
+        video.close()
+    except Exception:
+        pass
+    import gc
+    gc.collect()
 
     return output_path
 
@@ -542,11 +609,31 @@ def assemble_video_from_clips(
         logger=None,
     )
 
-    # Cleanup
-    narration.close()
-    final.close()
+    # Cleanup -- close ALL clips to release memory
+    try:
+        final.close()
+    except Exception:
+        pass
     for clip in clip_objects:
-        clip.close()
+        try:
+            clip.close()
+        except Exception:
+            pass
+    for clip in overlay_clips:
+        try:
+            clip.close()
+        except Exception:
+            pass
+    try:
+        narration.close()
+    except Exception:
+        pass
+    try:
+        video.close()
+    except Exception:
+        pass
+    import gc
+    gc.collect()
 
     print(f"[VideoAssembler] Grok clip assembly complete: {output_path}")
     return output_path
