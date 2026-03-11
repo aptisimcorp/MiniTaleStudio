@@ -52,14 +52,22 @@ def _update_job(job_id: str, updates: dict):
 
     # If status (partition key) changed, delete ALL old docs then create new one
     if new_status != old_status:
-        for old_item in items:
-            cosmos_db.delete_item("jobs", old_item["id"], old_item["status"])
-        # Remove Cosmos system properties before re-creating
+        # Create the new doc first so the job is never "missing"
         for key in ["_rid", "_self", "_etag", "_attachments", "_ts"]:
             item.pop(key, None)
         cosmos_db.create_item("jobs", item)
+        # Now delete every old partition doc
+        for old_item in items:
+            if old_item["status"] == new_status:
+                continue  # skip if same partition (already overwritten)
+            try:
+                cosmos_db.delete_item("jobs", old_item["id"], old_item["status"])
+            except Exception as e:
+                print(f"[_update_job] WARNING: failed to delete stale doc "
+                      f"(id={old_item['id']}, status={old_item['status']}): {e}")
     else:
         cosmos_db.upsert_item("jobs", item)
+
 
 
 def _set_step(job_id: str, step: PipelineStep, extra: dict | None = None):
