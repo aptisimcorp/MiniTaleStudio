@@ -226,28 +226,33 @@ def generate_scene_image(
 
     style_mod = STYLE_MODIFIERS.get(image_style, STYLE_MODIFIERS[ImageStyle.PHOTO_REALISM])
 
-    # Build a strict prompt with character consistency and portrait enforcement.
-    # NOTE: DALL-E-3 weights the END of prompts more heavily, so we repeat
-    # the portrait instruction at both start AND end.
-    portrait_instruction = (
-        "ABSOLUTE REQUIREMENT -- VERTICAL PORTRAIT 9:16 aspect ratio. "
-        "The image MUST be taller than it is wide, like a phone screen in portrait mode. "
-        "Frame subjects vertically: head near the top, feet near the bottom. "
-        "NEVER generate a landscape, horizontal, widescreen, or square image. "
-    )
-
     base_prompt = (
-        f"{portrait_instruction}"
-        f"\n\n"
-        f"STRICT ART STYLE: {style_mod}. "
-        f"The ENTIRE image must be rendered in this exact art style with no exceptions. "
-        f"\n\n"
-        f"{character_descriptions}"
-        f"\n\n"
-        f"SCENE: {scene.image_prompt}"
-        f"\n\n"
-        f"COMPOSITION REMINDER: This image is for a vertical phone screen (9:16 portrait). "
-        f"Tall narrow frame. Subject fills the vertical space. NOT landscape. NOT square."
+        "This image MUST be composed for a smartphone screen in portrait orientation.\n\n"
+        "Aspect ratio: 9:16 vertical.\n\n"
+        "Camera orientation:\n"
+        "A phone camera held upright capturing a tall vertical frame.\n\n"
+        "Composition rules:\n"
+        "• portrait photography framing\n"
+        "• vertical cinematic composition\n"
+        "• subject arranged from top to bottom\n"
+        "• tall narrow frame\n"
+        "• character centered in vertical space\n"
+        "• sky/background at top\n"
+        "• ground/environment at bottom\n\n"
+        f"STRICT ART STYLE:\n{style_mod}\n\n"
+        f"CHARACTER DESIGN (must stay consistent):\n{character_descriptions}\n\n"
+        f"SCENE DESCRIPTION:\n{scene.image_prompt}\n\n"
+        "CINEMATIC DETAILS:\n"
+        "beautiful lighting, depth, atmospheric perspective, high detail\n\n"
+        "NEGATIVE COMPOSITION RULES:\n"
+        "do NOT create landscape image\n"
+        "do NOT create horizontal frame\n"
+        "do NOT create widescreen composition\n"
+        "do NOT create square image\n"
+        "do NOT create panoramic shot\n\n"
+        "FINAL OUTPUT FORMAT:\n"
+        "Designed for TikTok, Instagram Reels, and YouTube Shorts vertical video frame.\n\n"
+        "Portrait orientation. 9:16 vertical composition. Tall mobile screen layout."
     )
 
     image_path = os.path.join(work_dir, f"scene_{scene.index:03d}.png")
