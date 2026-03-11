@@ -18,8 +18,12 @@ def get_scheduler() -> BackgroundScheduler:
 def _trigger_generation(configuration_id: str):
     from app.database import cosmos_db
     from app.workers.tasks import run_video_pipeline
+    from app.models import JobStatus, PipelineStep
     import uuid
     from datetime import datetime
+
+    if not cosmos_db.client:
+        cosmos_db.connect()
 
     items = cosmos_db.query_items(
         "configurations",
@@ -30,26 +34,42 @@ def _trigger_generation(configuration_id: str):
         print(f"[Scheduler] Configuration {configuration_id} not found, skipping.")
         return
 
-    config = items[0]
+    config_doc = items[0]
+    user_id = config_doc.get("user_id", "admin_user")
     job_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
 
+    # Build a clean config dict that matches ConfigurationCreate fields.
+    # Strip Cosmos metadata keys so Pydantic validation won't reject them.
+    _cosmos_keys = {"_rid", "_self", "_etag", "_attachments", "_ts", "id", "user_id", "created_at"}
+    config_dict = {k: v for k, v in config_doc.items() if k not in _cosmos_keys}
+
     job_item = {
         "id": job_id,
+        "user_id": user_id,
         "configuration_id": configuration_id,
-        "status": "queued",
-        "category": config.get("category", ""),
-        "language": config.get("language", ""),
-        "duration": config.get("duration", ""),
+        "status": JobStatus.QUEUED.value,
+        "pipeline_step": PipelineStep.QUEUED.value,
+        "category": config_doc.get("category", ""),
+        "language": config_doc.get("language", ""),
+        "duration": config_doc.get("duration", ""),
+        "ai_service": config_doc.get("ai_service", "openai"),
+        "character_style": config_doc.get("character_style", ""),
+        "characters": config_doc.get("characters", []),
+        "title": "",
+        "script": "",
         "video_path": None,
+        "blob_url": None,
+        "total_cost": 0.0,
         "error": None,
         "created_at": now,
         "updated_at": now,
+        "config_dict": config_dict,
     }
     cosmos_db.create_item("jobs", job_item)
 
-    run_video_pipeline.delay(job_id, config)
-    print(f"[Scheduler] Triggered job {job_id} for config {configuration_id}")
+    run_video_pipeline.delay(job_id, config_dict, user_id)
+    print(f"[Scheduler] Triggered job {job_id} for config {configuration_id} (user={user_id})")
 
 
 def add_schedule(schedule: dict):
@@ -99,10 +119,16 @@ def remove_schedule(schedule_id: str):
 def load_schedules_from_db():
     from app.database import cosmos_db
 
+    if not cosmos_db.client:
+        cosmos_db.connect()
+
     schedules = cosmos_db.query_items(
         "schedules",
         "SELECT * FROM c WHERE c.enabled = true",
     )
     for schedule in schedules:
-        add_schedule(schedule)
+        try:
+            add_schedule(schedule)
+        except Exception as e:
+            print(f"[Scheduler] Failed to load schedule {schedule.get('id')}: {e}")
     print(f"[Scheduler] Loaded {len(schedules)} schedules from DB")
