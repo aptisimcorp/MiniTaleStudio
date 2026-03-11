@@ -330,6 +330,11 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
             print(f"[Pipeline:{job_id}] Uploading to Azure Blob Storage...")
             blob_url = upload_video_to_blob(ctx.video_path)
 
+        # Verify upload actually succeeded (blob_url should start with http)
+        upload_ok = blob_url and blob_url.startswith("http")
+        if not upload_ok:
+            print(f"[Pipeline:{job_id}] WARNING: Blob upload failed - video only available locally at {blob_url}")
+
         save_checkpoint(
             work_dir,
             PipelineStep.UPLOADING,
@@ -344,7 +349,7 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
         _set_step(job_id, PipelineStep.CLEANUP)
         print(f"[Pipeline:{job_id}] Cleaning up temporary files...")
 
-        if blob_url and blob_url.startswith("http"):
+        if upload_ok:
             delete_local_file(ctx.video_path)
             import shutil
             if os.path.isdir(work_dir):
@@ -359,11 +364,12 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
 
         # == Done ===========================================================
         ctx.total_cost = cost.total_cost
+        final_status = JobStatus.COMPLETED.value if upload_ok else JobStatus.FAILED.value
         _update_job(job_id, {
-            "status": JobStatus.COMPLETED.value,
-            "pipeline_step": PipelineStep.DONE.value,
+            "status": final_status,
+            "pipeline_step": PipelineStep.DONE.value if upload_ok else PipelineStep.UPLOADING.value,
             "video_path": ctx.video_path,
-            "blob_url": blob_url,
+            "blob_url": blob_url if upload_ok else "",
             "title": ctx.story.title,
             "script": ctx.story.full_text,
             "user_id": user_id,
@@ -372,14 +378,15 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
             "characters": config.characters,
             "cost": cost.to_dict(),
             "total_cost": cost.total_cost,
+            "error": "" if upload_ok else "Blob upload failed - check AZURE_STORAGE_CONNECTION_STRING",
         })
-        print(f"[Pipeline:{job_id}] COMPLETED - {blob_url or ctx.video_path} "
+        print(f"[Pipeline:{job_id}] {final_status.upper()} - {blob_url or ctx.video_path} "
               f"(cost=${cost.total_cost:.4f})")
         return {
             "job_id": job_id,
-            "status": "completed",
+            "status": final_status,
             "video_path": ctx.video_path,
-            "blob_url": blob_url,
+            "blob_url": blob_url if upload_ok else "",
             "total_cost": cost.total_cost,
         }
 
@@ -419,3 +426,67 @@ def _generate_missing_images(scenes, missing_indices, config, work_dir):
             scene.image_path = img_path
 
     return scenes
+
+
+@celery_app.task(name="app.workers.tasks.retry_blob_upload", bind=True, max_retries=2)
+def retry_blob_upload(self, job_id: str):
+    """Re-upload a completed job's video to blob storage.
+
+    Picks up jobs that were marked completed but have a local path
+    instead of a real blob URL, uploads the file, and updates the record.
+    """
+    from app.services.blob_storage import upload_video_to_blob, delete_local_file
+
+    cosmos_db.connect()
+
+    items = cosmos_db.query_items(
+        "jobs",
+        "SELECT * FROM c WHERE c.id = @id",
+        [{"name": "@id", "value": job_id}],
+    )
+    if not items:
+        print(f"[RetryUpload:{job_id}] Job not found in CosmosDB")
+        return {"job_id": job_id, "status": "error", "detail": "Job not found"}
+
+    job = items[0]
+    current_blob = job.get("blob_url", "")
+    video_path = job.get("video_path", "")
+
+    # Already uploaded?
+    if current_blob and current_blob.startswith("http"):
+        print(f"[RetryUpload:{job_id}] Already has blob URL: {current_blob}")
+        return {"job_id": job_id, "status": "skipped", "blob_url": current_blob}
+
+    # Determine the local file to upload
+    local_path = video_path or current_blob
+    if not local_path or not os.path.exists(local_path):
+        msg = f"Local video file not found: {local_path}"
+        print(f"[RetryUpload:{job_id}] {msg}")
+        _update_job(job_id, {
+            "status": JobStatus.FAILED.value,
+            "pipeline_step": PipelineStep.UPLOADING.value,
+            "error": msg,
+        })
+        return {"job_id": job_id, "status": "failed", "detail": msg}
+
+    print(f"[RetryUpload:{job_id}] Uploading {local_path} ...")
+    blob_url = upload_video_to_blob(local_path)
+
+    if blob_url and blob_url.startswith("http"):
+        _update_job(job_id, {
+            "status": JobStatus.COMPLETED.value,
+            "pipeline_step": PipelineStep.DONE.value,
+            "blob_url": blob_url,
+            "error": "",
+        })
+        delete_local_file(local_path)
+        print(f"[RetryUpload:{job_id}] SUCCESS -> {blob_url}")
+        return {"job_id": job_id, "status": "completed", "blob_url": blob_url}
+    else:
+        _update_job(job_id, {
+            "status": JobStatus.FAILED.value,
+            "pipeline_step": PipelineStep.UPLOADING.value,
+            "error": "Blob upload failed on retry - check AZURE_STORAGE_CONNECTION_STRING",
+        })
+        print(f"[RetryUpload:{job_id}] FAILED - blob client unavailable")
+        return {"job_id": job_id, "status": "failed", "detail": "Blob upload failed"}

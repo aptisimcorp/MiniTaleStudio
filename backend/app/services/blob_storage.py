@@ -41,6 +41,16 @@ def get_blob_service_client():
     if not conn_str:
         print("[BlobStorage] WARNING: AZURE_STORAGE_CONNECTION_STRING is empty.")
         return None
+    # Quick sanity check: Blob Storage conn strings start with
+    # "DefaultEndpointsProtocol=".  CosmosDB ones start with "AccountEndpoint=".
+    if conn_str.startswith("AccountEndpoint="):
+        print(
+            "[BlobStorage] ERROR: AZURE_STORAGE_CONNECTION_STRING appears to be "
+            "a CosmosDB connection string, not an Azure Blob Storage one. "
+            "Expected format: DefaultEndpointsProtocol=https;AccountName=...;"
+            "AccountKey=...;EndpointSuffix=core.windows.net"
+        )
+        return None
     try:
         client = BlobServiceClient.from_connection_string(
             conn_str,
@@ -52,6 +62,13 @@ def get_blob_service_client():
         return client
     except Exception as e:
         print(f"[BlobStorage] ERROR creating BlobServiceClient: {e}")
+        if "missing required connection details" in str(e).lower():
+            print(
+                "[BlobStorage] HINT: Make sure AZURE_STORAGE_CONNECTION_STRING "
+                "is a Blob Storage connection string "
+                "(DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;"
+                "EndpointSuffix=core.windows.net), NOT a CosmosDB connection string."
+            )
         return None
 
 
