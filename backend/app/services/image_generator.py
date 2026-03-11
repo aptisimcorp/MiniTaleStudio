@@ -130,24 +130,40 @@ _TRIGGER_WORDS = [
 ]
 
 
+# Path to bundled fonts directory (backend/fonts/)
+_BUNDLED_FONTS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "fonts",
+)
+
+
+def _get_devanagari_font(size: int):
+    """Find a font that supports Devanagari (Hindi) text."""
+    candidates = []
+    # Bundled fonts first (most reliable)
+    if os.path.isdir(_BUNDLED_FONTS_DIR):
+        for name in sorted(os.listdir(_BUNDLED_FONTS_DIR)):
+            if name.lower().endswith((".ttf", ".otf")):
+                candidates.append(os.path.join(_BUNDLED_FONTS_DIR, name))
+    # System fonts
+    candidates += [
+        "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        "arial.ttf",
+    ]
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, size)
+        except (IOError, OSError):
+            continue
+    return ImageFont.load_default()
+
+
 def _create_placeholder_image(image_path: str, text: str) -> str:
     """Generate a dark gradient placeholder when DALL-E refuses the prompt."""
     img = Image.new("RGB", (1024, 1792), color=(15, 23, 42))
     draw = ImageDraw.Draw(img)
-    # Try to find a Devanagari-capable font
-    font = None
-    for candidate in [
-        "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-        "arial.ttf",
-    ]:
-        try:
-            font = ImageFont.truetype(candidate, 32)
-            break
-        except (IOError, OSError):
-            continue
-    if font is None:
-        font = ImageFont.load_default()
+    font = _get_devanagari_font(32)
     words = text.split()
     lines, line = [], ""
     for w in words:
@@ -255,6 +271,15 @@ def generate_scene_image(
             img_data = requests.get(image_url, timeout=120).content
             with open(image_path, "wb") as f:
                 f.write(img_data)
+
+            # Log raw dimensions before enforcement
+            raw_img = Image.open(image_path)
+            rw, rh = raw_img.size
+            raw_img.close()
+            if rw > rh:
+                print(f"[ImageGen] Scene {scene.index} DALL-E returned LANDSCAPE ({rw}x{rh}), will crop to portrait")
+            elif rw == rh:
+                print(f"[ImageGen] Scene {scene.index} DALL-E returned SQUARE ({rw}x{rh}), will crop to portrait")
 
             # Verify and enforce exact 9:16 portrait orientation
             _enforce_portrait_orientation(image_path)

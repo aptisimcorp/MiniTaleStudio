@@ -141,3 +141,4 @@ _cleanup_*.py
 /backend/story_20260308_190935TEMP_MPY_wvf_snd.mp4
 /.env.example
 /minitalestudio_character_pipeline.md
+*.mp4
