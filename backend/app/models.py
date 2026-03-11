@@ -115,6 +115,7 @@ class PipelineStep(str, Enum):
     SUBTITLES = "generating_subtitles"
     ASSEMBLING = "assembling_video"
     UPLOADING = "uploading_blob"
+    YOUTUBE_UPLOAD = "uploading_youtube"
     CLEANUP = "cleanup"
     DONE = "done"
 
@@ -129,6 +130,7 @@ PIPELINE_STEP_ORDER = [
     PipelineStep.SUBTITLES,
     PipelineStep.ASSEMBLING,
     PipelineStep.UPLOADING,
+    PipelineStep.YOUTUBE_UPLOAD,
     PipelineStep.CLEANUP,
     PipelineStep.DONE,
 ]
@@ -142,6 +144,7 @@ PIPELINE_STEP_LABELS = {
     PipelineStep.SUBTITLES: "Generating Subtitles",
     PipelineStep.ASSEMBLING: "Assembling Video",
     PipelineStep.UPLOADING: "Uploading to Cloud",
+    PipelineStep.YOUTUBE_UPLOAD: "Uploading to YouTube",
     PipelineStep.CLEANUP: "Cleaning Up",
     PipelineStep.DONE: "Done",
 }

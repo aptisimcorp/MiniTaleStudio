@@ -1,3 +1,4 @@
+import gc
 import os
 import traceback
 from datetime import datetime
@@ -29,6 +30,33 @@ from app.services.checkpoint import (
 )
 from app.services.character_service import build_character_prompt_block, get_character_reference_images
 from app.services.cost_tracker import VideoCostTracker
+from app.services.youtube_uploader import upload_to_youtube
+
+
+# Upload directory (same as main.py's UPLOAD_DIR)
+_UPLOAD_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "uploads",
+)
+
+
+def _resolve_asset_path(path: str | None) -> str | None:
+    """Resolve a watermark/splash path to an absolute path.
+
+    The frontend may send just a filename (from /upload endpoint) or
+    a full path. Try to find the file in the uploads directory if the
+    given path doesn't exist directly.
+    """
+    if not path:
+        return None
+    if os.path.exists(path):
+        return path
+    # Try resolving against uploads directory
+    candidate = os.path.join(_UPLOAD_DIR, os.path.basename(path))
+    if os.path.exists(candidate):
+        return candidate
+    print(f"[Pipeline] WARNING: Asset file not found: {path} (also tried {candidate})")
+    return None
 
 
 def _update_job(job_id: str, updates: dict):
@@ -199,6 +227,7 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
                 PipelineStep.VIDEO_CLIPS,
                 story_data=ctx.story.model_dump(),
             )
+            gc.collect()  # free video clip generation memory
         else:
             # --- OpenAI path: generate images per scene --------------------
             _set_step(job_id, PipelineStep.IMAGES)
@@ -240,6 +269,8 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
                 PipelineStep.IMAGES,
                 story_data=ctx.story.model_dump(),
             )
+
+        gc.collect()  # free image generation memory before next step
 
         # == Step 3: Generate Narration =====================================
         _set_step(job_id, PipelineStep.NARRATION)
@@ -298,15 +329,27 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
             ctx.video_path = prior_video
         else:
             category_val = config.category.value if hasattr(config.category, 'value') else str(config.category)
+
+            # Resolve watermark/splash paths (may be just filenames from /upload)
+            resolved_watermark = _resolve_asset_path(config.watermark_path)
+            resolved_splash_start = _resolve_asset_path(config.splash_start_path)
+            resolved_splash_end = _resolve_asset_path(config.splash_end_path)
+            if resolved_watermark:
+                print(f"[Pipeline:{job_id}] Watermark: {resolved_watermark}")
+            if resolved_splash_start:
+                print(f"[Pipeline:{job_id}] Splash start: {resolved_splash_start}")
+            if resolved_splash_end:
+                print(f"[Pipeline:{job_id}] Splash end: {resolved_splash_end}")
+
             assemble_kwargs = dict(
                 scenes=ctx.story.scenes,
                 narration_path=ctx.narration_path,
                 subtitle_path=ctx.subtitle_path,
                 subtitle_style=config.subtitle_style,
                 work_dir=work_dir,
-                watermark_path=config.watermark_path,
-                splash_start_path=config.splash_start_path,
-                splash_end_path=config.splash_end_path,
+                watermark_path=resolved_watermark,
+                splash_start_path=resolved_splash_start,
+                splash_end_path=resolved_splash_end,
                 background_music=config.background_music,
                 category=category_val,
             )
@@ -326,6 +369,8 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
             subtitle_path=ctx.subtitle_path,
             video_path=ctx.video_path,
         )
+
+        gc.collect()  # free video assembly memory before upload
 
         # == Step 6: Upload to Azure Blob Storage ===========================
         _set_step(job_id, PipelineStep.UPLOADING)
@@ -353,7 +398,27 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
             blob_url=blob_url,
         )
 
-        # == Step 7: Cleanup ================================================
+        # == Step 7: Auto-upload to YouTube =================================
+        youtube_result = None
+        if upload_ok:
+            _set_step(job_id, PipelineStep.YOUTUBE_UPLOAD)
+            try:
+                video_source = blob_url if upload_ok else ctx.video_path
+                youtube_result = upload_to_youtube(
+                    user_id=user_id,
+                    video_source=video_source,
+                    title=ctx.story.title,
+                    category=config.category.value if hasattr(config.category, 'value') else str(config.category),
+                    language=config.language.value if hasattr(config.language, 'value') else str(config.language),
+                )
+                if youtube_result:
+                    print(f"[Pipeline:{job_id}] YouTube upload: {youtube_result['youtube_url']}")
+                else:
+                    print(f"[Pipeline:{job_id}] YouTube auto-upload skipped (no account connected)")
+            except Exception as yt_err:
+                print(f"[Pipeline:{job_id}] YouTube auto-upload failed (non-fatal): {yt_err}")
+
+        # == Step 8: Cleanup ================================================
         _set_step(job_id, PipelineStep.CLEANUP)
         print(f"[Pipeline:{job_id}] Cleaning up temporary files...")
 
@@ -387,6 +452,9 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
             "cost": cost.to_dict(),
             "total_cost": cost.total_cost,
             "error": "" if upload_ok else "Blob upload failed - check AZURE_STORAGE_CONNECTION_STRING",
+            "youtube_video_id": youtube_result["youtube_video_id"] if youtube_result else "",
+            "youtube_url": youtube_result["youtube_url"] if youtube_result else "",
+            "youtube_uploaded_at": datetime.utcnow().isoformat() if youtube_result else "",
         })
         print(f"[Pipeline:{job_id}] {final_status.upper()} - {blob_url or ctx.video_path} "
               f"(cost=${cost.total_cost:.4f})")
