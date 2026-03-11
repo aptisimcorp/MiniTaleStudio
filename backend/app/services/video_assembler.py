@@ -51,32 +51,71 @@ SUBTITLE_STYLES = {
 }
 
 # Try to find a font that supports Hindi (Devanagari) and Latin scripts
+_BUNDLED_FONTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "fonts")
+
 def _get_font(size: int):
+    """Return a TrueType font that supports Devanagari + Latin scripts."""
     # Build list of candidate paths: prefer Unicode-capable fonts first
     candidates = []
+
+    # 1) Bundled fonts in backend/fonts/ (most reliable on any platform)
+    if os.path.isdir(_BUNDLED_FONTS_DIR):
+        for name in sorted(os.listdir(_BUNDLED_FONTS_DIR)):
+            if name.lower().endswith((".ttf", ".otf")):
+                candidates.append(os.path.join(_BUNDLED_FONTS_DIR, name))
+
+    # 2) Platform-specific system fonts
     if sys.platform == "win32":
         fonts_dir = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
-        # Nirmala UI: ships with Windows, supports Devanagari + Latin
         candidates += [
             os.path.join(fonts_dir, "Nirmala.ttf"),
             os.path.join(fonts_dir, "NirmalaB.ttf"),
             os.path.join(fonts_dir, "arial.ttf"),
         ]
     else:
+        # Linux: Noto fonts installed via apt (fonts-noto package)
         candidates += [
             "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
             "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansDevanagari[wdth,wght].ttf",
+        ]
+        # Search recursively for any Noto Devanagari font
+        for search_dir in ["/usr/share/fonts", "/usr/local/share/fonts"]:
+            if os.path.isdir(search_dir):
+                for root, dirs, files in os.walk(search_dir):
+                    for f in files:
+                        if "devanagari" in f.lower() and f.endswith((".ttf", ".otf")):
+                            candidates.append(os.path.join(root, f))
+        candidates += [
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
         ]
-    # Generic names as fallback (Pillow searches system font dirs)
-    candidates += ["NirmalaUI", "Nirmala.ttf", "arial.ttf", "DejaVuSans.ttf"]
+
+    # 3) Generic names as fallback (Pillow searches system font dirs)
+    candidates += ["NotoSansDevanagari-Regular.ttf", "NirmalaUI", "Nirmala.ttf", "arial.ttf", "DejaVuSans.ttf"]
 
     for path in candidates:
         try:
-            return ImageFont.truetype(path, size)
+            font = ImageFont.truetype(path, size)
+            # Quick check: can it render a Devanagari character?
+            try:
+                bbox = font.getbbox("\u0905")  # ?
+                if bbox and (bbox[2] - bbox[0]) > 0:
+                    return font
+            except Exception:
+                pass
+            # If Devanagari check fails, still usable for Latin -- keep searching
+            # but remember this as a fallback
+            if not hasattr(_get_font, "_latin_fallback"):
+                _get_font._latin_fallback = font
         except (IOError, OSError):
             continue
+
+    # Return best available: Latin fallback or Pillow default
+    if hasattr(_get_font, "_latin_fallback"):
+        print("[VideoAssembler] WARNING: No Devanagari font found, Hindi subtitles may show as blocks")
+        return _get_font._latin_fallback
+    print("[VideoAssembler] WARNING: No TrueType fonts found at all, using Pillow default")
     return ImageFont.load_default()
 
 
