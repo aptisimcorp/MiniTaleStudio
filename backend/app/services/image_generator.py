@@ -94,18 +94,59 @@ STYLE_MODIFIERS = {
 
 # Safety prefix injected into every prompt to reduce content-filter rejections
 SAFETY_PREFIX = (
-    "Safe-for-work illustration suitable for all audiences. "
-    "No violence, blood, weapons, or explicit content. "
+    "Safe-for-work digital illustration suitable for all ages. "
+    "No violence, blood, weapons, gore, nudity, or suggestive content. "
+    "Family-friendly, non-threatening imagery only. "
 )
+
+# Words / phrases that commonly trigger OpenAI content filters
+_TRIGGER_WORDS = [
+    # violence / gore
+    "blood", "bloody", "gore", "gory", "murder", "murdered", "murderer",
+    "kill", "killed", "killing", "killer", "death", "dead body", "corpse",
+    "weapon", "gun", "pistol", "rifle", "shotgun", "bullet",
+    "knife", "blade", "sword", "dagger", "axe",
+    "stab", "stabbed", "stabbing", "slash", "slashed",
+    "strangle", "strangled", "strangling", "choke", "choked",
+    "violent", "violence", "attack", "attacked", "assault",
+    "horror", "terrifying", "terrified", "horrifying", "gruesome",
+    "disturbing", "torture", "tortured", "scream", "screaming",
+    "wound", "wounded", "bleed", "bleeding", "bruise", "scar",
+    "dismember", "decapitate", "mutilate", "butcher",
+    "poison", "poisoned", "suffocate", "suffocated",
+    "fight", "fighting", "punch", "punched", "beaten",
+    # sexual / explicit
+    "explicit", "nude", "naked", "sexy", "seductive", "sensual",
+    "erotic", "provocative", "intimate", "undressed", "lingerie",
+    # horror-adjacent atmosphere
+    "demonic", "demon", "satan", "satanic", "devil", "possessed",
+    "evil spirit", "dark ritual", "sacrifice", "sacrificial",
+    "haunted", "ghost", "phantom", "apparition",
+    "cemetery", "graveyard", "tombstone",
+    # threatening imagery
+    "kidnap", "kidnapped", "hostage", "captive",
+    "stalker", "stalking", "prey", "predator",
+    "threatening", "menacing", "sinister",
+]
 
 
 def _create_placeholder_image(image_path: str, text: str) -> str:
     """Generate a dark gradient placeholder when DALL-E refuses the prompt."""
     img = Image.new("RGB", (1024, 1792), color=(15, 23, 42))
     draw = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype("arial.ttf", 32)
-    except (IOError, OSError):
+    # Try to find a Devanagari-capable font
+    font = None
+    for candidate in [
+        "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        "arial.ttf",
+    ]:
+        try:
+            font = ImageFont.truetype(candidate, 32)
+            break
+        except (IOError, OSError):
+            continue
+    if font is None:
         font = ImageFont.load_default()
     words = text.split()
     lines, line = [], ""
@@ -127,18 +168,36 @@ def _create_placeholder_image(image_path: str, text: str) -> str:
 
 def _sanitize_prompt(prompt: str) -> str:
     """Strip potentially triggering words and re-frame for safety."""
-    remove_words = [
-        "blood", "bloody", "gore", "gory", "murder", "kill", "killing",
-        "dead body", "corpse", "weapon", "gun", "knife", "stab",
-        "violent", "violence", "attack", "assault", "horror", "terrifying",
-        "gruesome", "disturbing", "explicit", "nude", "naked", "sexy",
-    ]
     sanitized = prompt
-    for word in remove_words:
-        sanitized = sanitized.replace(word, "dramatic scene")
-        sanitized = sanitized.replace(word.capitalize(), "dramatic scene")
-        sanitized = sanitized.replace(word.upper(), "dramatic scene")
+    for word in _TRIGGER_WORDS:
+        # Case-insensitive replacement with a neutral phrase
+        for variant in (word, word.capitalize(), word.upper()):
+            sanitized = sanitized.replace(variant, "mysterious scene")
     return SAFETY_PREFIX + sanitized
+
+
+def _build_safe_fallback_prompt(scene: Scene, style_mod: str) -> str:
+    """Build a heavily sanitized last-resort prompt focusing only on setting and mood.
+
+    Strips the original image_prompt entirely and generates from the
+    narration text, keeping only safe visual elements.
+    """
+    # Take only the first 200 chars of scene text, sanitized
+    safe_text = scene.text[:200]
+    for word in _TRIGGER_WORDS:
+        for variant in (word, word.capitalize(), word.upper()):
+            safe_text = safe_text.replace(variant, "")
+
+    return (
+        f"{SAFETY_PREFIX}"
+        f"STRICT ART STYLE: {style_mod}. "
+        f"VERTICAL PORTRAIT 9:16 composition, tall narrow frame. "
+        f"A calm, atmospheric scene inspired by this narration: \"{safe_text.strip()}\". "
+        f"Focus on the setting, environment, and mood. "
+        f"Show landscape, architecture, or nature. "
+        f"Soft cinematic lighting, peaceful composition. "
+        f"Do NOT depict any violence, conflict, or distress."
+    )
 
 
 def generate_scene_image(
@@ -151,12 +210,18 @@ def generate_scene_image(
 
     style_mod = STYLE_MODIFIERS.get(image_style, STYLE_MODIFIERS[ImageStyle.PHOTO_REALISM])
 
-    # Build a strict prompt with character consistency and portrait enforcement
+    # Build a strict prompt with character consistency and portrait enforcement.
+    # NOTE: DALL-E-3 weights the END of prompts more heavily, so we repeat
+    # the portrait instruction at both start AND end.
+    portrait_instruction = (
+        "ABSOLUTE REQUIREMENT -- VERTICAL PORTRAIT 9:16 aspect ratio. "
+        "The image MUST be taller than it is wide, like a phone screen in portrait mode. "
+        "Frame subjects vertically: head near the top, feet near the bottom. "
+        "NEVER generate a landscape, horizontal, widescreen, or square image. "
+    )
+
     base_prompt = (
-        f"MANDATORY COMPOSITION: Vertical PORTRAIT orientation (9:16 ratio). "
-        f"The image is TALLER than it is wide. Think phone screen, NOT TV screen. "
-        f"Frame the subject vertically  -  head near top, feet near bottom. "
-        f"DO NOT create any landscape, horizontal, or square composition. "
+        f"{portrait_instruction}"
         f"\n\n"
         f"STRICT ART STYLE: {style_mod}. "
         f"The ENTIRE image must be rendered in this exact art style with no exceptions. "
@@ -164,13 +229,17 @@ def generate_scene_image(
         f"{character_descriptions}"
         f"\n\n"
         f"SCENE: {scene.image_prompt}"
+        f"\n\n"
+        f"COMPOSITION REMINDER: This image is for a vertical phone screen (9:16 portrait). "
+        f"Tall narrow frame. Subject fills the vertical space. NOT landscape. NOT square."
     )
 
     image_path = os.path.join(work_dir, f"scene_{scene.index:03d}.png")
 
     prompts_to_try = [
-        SAFETY_PREFIX + base_prompt,
-        _sanitize_prompt(base_prompt),
+        SAFETY_PREFIX + base_prompt,                          # Attempt 1: original + safety prefix
+        _sanitize_prompt(base_prompt),                        # Attempt 2: word-level sanitized
+        _build_safe_fallback_prompt(scene, style_mod),        # Attempt 3: environment-only fallback
     ]
 
     for attempt, prompt in enumerate(prompts_to_try):
@@ -190,51 +259,56 @@ def generate_scene_image(
             # Verify and enforce exact 9:16 portrait orientation
             _enforce_portrait_orientation(image_path)
 
+            if attempt > 0:
+                print(f"[ImageGen] Scene {scene.index} succeeded on attempt {attempt+1}")
             return image_path
 
         except BadRequestError as e:
             if "content_policy_violation" in str(e):
-                print(f"[ImageGen] Scene {scene.index} attempt {attempt+1} blocked by content filter, retrying...")
+                label = ["original+prefix", "sanitized", "safe-fallback"][attempt]
+                print(f"[ImageGen] Scene {scene.index} attempt {attempt+1} ({label}) blocked by content filter, retrying...")
                 continue
             raise
 
-    print(f"[ImageGen] Scene {scene.index} - all prompts blocked, using placeholder image")
+    print(f"[ImageGen] Scene {scene.index} - all 3 prompts blocked, using placeholder image")
     return _create_placeholder_image(image_path, scene.text[:120])
 
 
 def _enforce_portrait_orientation(image_path: str, target_w: int = 1024, target_h: int = 1792):
-    """Ensure image is strictly portrait 9:16. Rotate landscape images, then crop/resize."""
+    """Ensure image is strictly portrait 9:16.
+
+    If DALL-E returns a landscape or square image, smart-crop to portrait
+    (center-crop the width) then resize. Never rotate -- that makes content sideways.
+    """
     img = Image.open(image_path)
     w, h = img.size
 
-    # If image is landscape (wider than tall), rotate to make it portrait
-    if w > h:
-        print(f"[ImageGen] Rotating landscape image ({w}x{h}) to portrait")
-        img = img.rotate(90, expand=True)
-        w, h = img.size
-
     if w == target_w and h == target_h:
-        img.save(image_path, "PNG")
         return
+
+    # Log if DALL-E ignored our portrait request
+    if w > h:
+        print(f"[ImageGen] WARNING: DALL-E returned landscape ({w}x{h}), cropping to portrait")
+    elif w == h:
+        print(f"[ImageGen] WARNING: DALL-E returned square ({w}x{h}), cropping to portrait")
 
     # Center-crop to target aspect ratio then resize
     target_ratio = target_w / target_h
     current_ratio = w / h
 
     if current_ratio > target_ratio:
-        # Too wide - crop sides
+        # Too wide -- crop sides (center-crop horizontally)
         new_w = int(h * target_ratio)
         left = (w - new_w) // 2
         img = img.crop((left, 0, left + new_w, h))
     elif current_ratio < target_ratio:
-        # Too tall - crop top/bottom
+        # Too tall -- crop top/bottom (center-crop vertically)
         new_h = int(w / target_ratio)
         top = (h - new_h) // 2
         img = img.crop((0, top, w, top + new_h))
 
     img = img.resize((target_w, target_h), Image.LANCZOS)
     img.save(image_path, "PNG")
-
 
 
 def generate_all_images(

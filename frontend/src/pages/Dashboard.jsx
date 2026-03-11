@@ -12,10 +12,18 @@ import {
   scheduleJob,
 } from "../api/client";
 
+// Map character_style -> image_style so the backend gets a valid ImageStyle
+const CHARACTER_TO_IMAGE_STYLE = {
+  realistic: "photo_realism",
+  "3dtoon": "3d_toon",
+  ghibli: "studio_ghibli",
+  lego: "lego",
+};
+
 const DEFAULT_CONFIG = {
   category: "horror",
   custom_category: "",
-  language: "english",
+  language: "hindi",
   duration: "60-90",
   voice_type: "alloy",
   background_music: false,
@@ -73,7 +81,7 @@ export default function Dashboard() {
             voice_type: config.voice_type,
             background_music: config.background_music,
             subtitle_style: config.subtitle_style,
-            image_style: config.image_style,
+            image_style: CHARACTER_TO_IMAGE_STYLE[config.character_style] || "photo_realism",
             watermark_path: config.watermark_path || null,
             splash_start_path: config.splash_start_path || null,
             splash_end_path: config.splash_end_path || null,

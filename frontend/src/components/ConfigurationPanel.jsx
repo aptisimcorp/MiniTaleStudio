@@ -62,8 +62,22 @@ const SUBTITLE_STYLES = [
 
 const VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
 
+const CHARACTER_TO_IMAGE_STYLE = {
+  realistic: "photo_realism",
+  "3dtoon": "3d_toon",
+  ghibli: "studio_ghibli",
+  lego: "lego",
+};
+
 export default function ConfigurationPanel({ config, onChange }) {
-const update = (key, value) => onChange({ ...config, [key]: value });
+const update = (key, value) => {
+  const next = { ...config, [key]: value };
+  // Keep image_style in sync when character_style changes
+  if (key === "character_style") {
+    next.image_style = CHARACTER_TO_IMAGE_STYLE[value] || "photo_realism";
+  }
+  onChange(next);
+};
 const watermarkRef = useRef(null);
 const splashStartRef = useRef(null);
 const splashEndRef = useRef(null);
@@ -261,27 +275,7 @@ const selectedStyle = config.character_style || "realistic";
         </div>
       </div>
 
-      {/* Image Style (only shown for OpenAI pipeline) */}
-      {config.ai_service !== "grok" && (
-        <div>
-          <label className="block text-sm font-medium text-dark-300 mb-1">Image Style</label>
-          <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
-            {IMAGE_STYLES.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => update("image_style", s.value)}
-                className={`px-2 py-2 rounded-lg text-xs font-medium transition-all ${
-                  config.image_style === s.value
-                    ? "bg-primary-600 text-white shadow-lg shadow-primary-600/25"
-                    : "bg-dark-800 text-dark-300 hover:bg-dark-700"
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Image Style - hidden; derived from Character Style automatically */}
 
       {/* Voice Type */}
       <div>

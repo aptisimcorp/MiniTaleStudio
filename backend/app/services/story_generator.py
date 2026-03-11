@@ -109,7 +109,11 @@ Return your response as valid JSON with this exact structure:
   ]
 }}
 
-IMPORTANT: image_prompt must be safe for AI image generation - describe mood and atmosphere instead of violence, weapons, or graphic content. Use metaphorical and artistic descriptions.
+IMPORTANT: image_prompt MUST be safe for AI image generation (DALL-E).
+- NEVER use words like: blood, kill, murder, dead, corpse, weapon, gun, knife, stab, horror, gore, attack, violence, fight, scream, wound, demon, ghost, haunted, graveyard, torture, disturbing, gruesome, nude, naked, sexy
+- Instead describe mood through: lighting, shadows, atmosphere, weather, colors, expressions, body language
+- For tense scenes use: "uneasy atmosphere", "dim flickering light", "nervous expression", "shadowy corner", "fog-covered path"
+- For horror/thriller: focus on MOOD and SETTING, never depict explicit violence or threatening actions
 Return ONLY the JSON, no extra text."""
 
     response = client.chat.completions.create(
