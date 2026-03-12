@@ -424,6 +424,26 @@ const selectedStyle = config.character_style || "realistic";
           />
         </button>
       </div>
+
+      {/* Auto Upload to YouTube */}
+      <div className="flex items-center justify-between">
+        <div>
+          <label className="text-sm font-medium text-dark-300">Auto Upload to YouTube</label>
+          <p className="text-xs text-dark-500">Upload automatically after generation</p>
+        </div>
+        <button
+          onClick={() => update("auto_upload_youtube", !config.auto_upload_youtube)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            config.auto_upload_youtube ? "bg-red-600" : "bg-dark-600"
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              config.auto_upload_youtube ? "translate-x-6" : "translate-x-1"
+            }`}
+          />
+        </button>
+      </div>
     </div>
   );
 }

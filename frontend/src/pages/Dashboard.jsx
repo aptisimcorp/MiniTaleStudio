@@ -21,14 +21,15 @@ const CHARACTER_TO_IMAGE_STYLE = {
 };
 
 const DEFAULT_CONFIG = {
-  category: "horror",
-  custom_category: "",
-  language: "hindi",
-  duration: "60-90",
-  voice_type: "alloy",
-  background_music: false,
-  subtitle_style: "default",
-  image_style: "photo_realism",
+category: "horror",
+custom_category: "",
+language: "hindi",
+duration: "60-90",
+voice_type: "alloy",
+background_music: false,
+auto_upload_youtube: false,
+subtitle_style: "default",
+image_style: "photo_realism",
   num_videos: 1,
   // Character pipeline
   ai_service: "openai",
@@ -80,6 +81,7 @@ export default function Dashboard() {
             duration: config.duration,
             voice_type: config.voice_type,
             background_music: config.background_music,
+            auto_upload_youtube: config.auto_upload_youtube,
             subtitle_style: config.subtitle_style,
             image_style: CHARACTER_TO_IMAGE_STYLE[config.character_style] || "photo_realism",
             watermark_path: config.watermark_path || null,

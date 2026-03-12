@@ -400,7 +400,8 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
 
         # == Step 7: Auto-upload to YouTube =================================
         youtube_result = None
-        if upload_ok:
+        auto_yt = getattr(config, 'auto_upload_youtube', False)
+        if upload_ok and auto_yt:
             _set_step(job_id, PipelineStep.YOUTUBE_UPLOAD)
             try:
                 video_source = blob_url if upload_ok else ctx.video_path
@@ -417,6 +418,8 @@ def run_video_pipeline(self, job_id: str, config_dict: dict, user_id: str = "adm
                     print(f"[Pipeline:{job_id}] YouTube auto-upload skipped (no account connected)")
             except Exception as yt_err:
                 print(f"[Pipeline:{job_id}] YouTube auto-upload failed (non-fatal): {yt_err}")
+        elif upload_ok and not auto_yt:
+            print(f"[Pipeline:{job_id}] YouTube auto-upload disabled, skipping (user can upload manually)")
 
         # == Step 8: Cleanup ================================================
         _set_step(job_id, PipelineStep.CLEANUP)

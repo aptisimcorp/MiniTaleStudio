@@ -163,6 +163,7 @@ class ConfigurationCreate(BaseModel):
     num_videos: int = Field(default=1, ge=1, le=10)
     voice_type: str = "alloy"
     background_music: bool = False
+    auto_upload_youtube: bool = False
     subtitle_style: SubtitleStyle = SubtitleStyle.DEFAULT
     image_style: ImageStyle = ImageStyle.PHOTO_REALISM
     watermark_path: Optional[str] = None
@@ -236,6 +237,7 @@ class GenerateVideoRequest(BaseModel):
     duration: DurationRange = DurationRange.SHORT
     voice_type: str = "alloy"
     background_music: bool = False
+    auto_upload_youtube: bool = False
     subtitle_style: SubtitleStyle = SubtitleStyle.DEFAULT
     image_style: ImageStyle = ImageStyle.PHOTO_REALISM
     watermark_path: Optional[str] = None
